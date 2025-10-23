@@ -5,7 +5,15 @@ import cookieParser from 'cookie-parser';
 import authRouter from './routes/auth/UserRoute.js';
 
 const app=express();
-app.use(cors());
+
+// Configure CORS for Next.js client on port 3000
+app.use(cors({
+    origin: 'http://localhost:3000',
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Cookie']
+}));
+
 app.use(express.json());
 app.use(cookieParser());
 

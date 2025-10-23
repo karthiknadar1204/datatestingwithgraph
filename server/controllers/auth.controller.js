@@ -2,7 +2,7 @@ import bcrypt from 'bcrypt';
 import { eq } from 'drizzle-orm';
 import { db } from '../config/database.js';
 import { users } from '../models/user.js';
-import { generateAccessToken, generateRefreshToken, verifyRefreshToken } from '../utils/tokenUtils.js';
+import { generateAccessToken, generateRefreshToken, verifyRefreshToken, verifyAccessToken } from '../utils/tokenUtils.js';
 
 export const register = async (req, res) => {
     const { name, email, password } = req.body;
@@ -99,4 +99,33 @@ export const logout = async (req, res) => {
     res.clearCookie('accessToken');
     res.clearCookie('refreshToken');
     res.status(200).json({ message: 'Logout successful' });
+}
+
+export const me = async (req, res) => {
+    try {
+        const accessToken = req.cookies.accessToken;
+        
+        if (!accessToken) {
+            return res.status(401).json({ message: 'No access token provided' });
+        }
+
+        const decoded = verifyAccessToken(accessToken);
+        if (!decoded) {
+            return res.status(401).json({ message: 'Invalid access token' });
+        }
+
+        const usersFound = await db.select().from(users).where(eq(users.id, decoded.userId)).limit(1);
+        const user = usersFound[0];
+        
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        res.status(200).json({ 
+            user: { id: user.id, name: user.name, email: user.email }
+        });
+    } catch (error) {
+        console.error('Me endpoint error:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
 }
