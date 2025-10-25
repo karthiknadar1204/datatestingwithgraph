@@ -27,9 +27,9 @@ export default function Navigation() {
                 <User className="w-4 h-4" />
                 <span>{user.name}</span>
               </div>
-              <Link href="/chat">
+              <Link href="/dashboard">
                 <Button className="gap-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 shadow-lg shadow-cyan-500/30">
-                  Go to Chat
+                  Go to Dashboard
                   <ArrowRight className="w-4 h-4" />
                 </Button>
               </Link>

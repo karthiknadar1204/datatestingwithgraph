@@ -35,7 +35,7 @@ export default function LoginPage() {
     const result = await login(formData.email, formData.password)
     
     if (result.success) {
-      router.push("/chat")
+      router.push("/dashboard")
     } else {
       setError(result.error)
     }

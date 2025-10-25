@@ -8,6 +8,13 @@
       "when": 1761209270054,
       "tag": "0000_abandoned_the_hunter",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1761402096369,
+      "tag": "0001_pink_thanos",
+      "breakpoints": true
     }
   ]
 }
