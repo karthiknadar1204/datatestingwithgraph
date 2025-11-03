@@ -2,7 +2,6 @@ import bcrypt from 'bcrypt';
 import { eq } from 'drizzle-orm';
 import { db } from '../config/database.js';
 import { users } from '../models/user.js';
-import { generateAccessToken, generateRefreshToken, verifyRefreshToken, verifyAccessToken } from '../utils/tokenUtils.js';
 
 export const register = async (req, res) => {
     const { name, email, password } = req.body;
@@ -39,21 +38,12 @@ export const login = async (req, res) => {
         if (!isPasswordCorrect) {
             return res.status(400).json({ message: 'Invalid password' });
         }
-        const accessToken = generateAccessToken(user.id);
-        const refreshToken = generateRefreshToken(user.id);
 
-        res.cookie('accessToken', accessToken, {
+        res.cookie('userId', user.id, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
-            maxAge: 15 * 60 * 1000,
-            sameSite: 'strict'
-        });
-
-        res.cookie('refreshToken', refreshToken, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            maxAge: 7 * 24 * 60 * 60 * 1000,
-            sameSite: 'strict'
+            maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+            sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax'
         });
 
         res.status(200).json({ 
@@ -66,61 +56,26 @@ export const login = async (req, res) => {
     }
 }
 
-export const refresh = async (req, res) => {
-    try {
-        const refreshToken = req.cookies.refreshToken;
-        
-        if (!refreshToken) {
-            return res.status(401).json({ message: 'Refresh token not provided' });
-        }
-
-        const decoded = verifyRefreshToken(refreshToken);
-        if (!decoded) {
-            return res.status(401).json({ message: 'Invalid refresh token' });
-        }
-
-        const newAccessToken = generateAccessToken(decoded.userId);
-
-        res.cookie('accessToken', newAccessToken, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            maxAge: 15 * 60 * 1000,
-            sameSite: 'strict'
-        });
-
-        res.status(200).json({ message: 'Token refreshed successfully' });
-    } catch (error) {
-        console.error('Refresh token error:', error);
-        res.status(500).json({ message: 'Internal server error' });
-    }
-}
-
 export const logout = async (req, res) => {
-    res.clearCookie('accessToken');
-    res.clearCookie('refreshToken');
+    res.clearCookie('userId', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax'
+    });
     res.status(200).json({ message: 'Logout successful' });
 }
 
 export const me = async (req, res) => {
     try {
-        const accessToken = req.cookies.accessToken;
-        
-        if (!accessToken) {
-            return res.status(401).json({ message: 'No access token provided' });
+        const userId = req.cookies.userId;
+        if (!userId) {
+            return res.status(401).json({ message: 'Not authenticated' });
         }
-
-        const decoded = verifyAccessToken(accessToken);
-        if (!decoded) {
-            return res.status(401).json({ message: 'Invalid access token' });
-        }
-
-        const usersFound = await db.select().from(users).where(eq(users.id, decoded.userId)).limit(1);
+        const usersFound = await db.select().from(users).where(eq(users.id, parseInt(userId))).limit(1);
         const user = usersFound[0];
-        
         if (!user) {
             return res.status(404).json({ message: 'User not found' });
         }
-
         res.status(200).json({ 
             user: { id: user.id, name: user.name, email: user.email }
         });

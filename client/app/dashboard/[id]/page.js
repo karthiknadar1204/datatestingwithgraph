@@ -67,7 +67,6 @@ export default function DatabaseChatPage() {
     setMessages([...messages, newMessage])
     setInputMessage("")
 
-    // Simulate AI response
     setTimeout(() => {
       const aiResponse = {
         id: Date.now() + 1,
