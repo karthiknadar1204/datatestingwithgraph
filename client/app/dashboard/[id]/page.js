@@ -55,27 +55,74 @@ export default function DatabaseChatPage() {
 
   const handleSendMessage = async (e) => {
     e.preventDefault()
-    if (!inputMessage.trim()) return
+    if (!inputMessage.trim() || !database) return
 
-    const newMessage = {
+    const userMessage = {
       id: Date.now(),
       text: inputMessage,
       sender: 'user',
       timestamp: new Date().toISOString()
     }
 
-    setMessages([...messages, newMessage])
+    setMessages(prev => [...prev, userMessage])
+    const currentInput = inputMessage
     setInputMessage("")
 
-    setTimeout(() => {
-      const aiResponse = {
-        id: Date.now() + 1,
-        text: "I understand you want to query the database. This is a placeholder response. The actual AI integration will be implemented later.",
+    // Add loading message
+    const loadingMessage = {
+      id: Date.now() + 1,
+      text: "Thinking...",
+      sender: 'ai',
+      timestamp: new Date().toISOString(),
+      loading: true
+    }
+    setMessages(prev => [...prev, loadingMessage])
+
+    try {
+      const response = await fetch(`http://localhost:3004/api/databases/${params.id}/chat`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          question: currentInput,
+          connectionId: database.id
+        })
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        
+        // Remove loading message
+        setMessages(prev => prev.filter(msg => !msg.loading))
+        
+        // Add AI response
+        const aiResponse = {
+          id: Date.now() + 2,
+          text: data.response,
+          sender: 'ai',
+          timestamp: new Date().toISOString()
+        }
+        setMessages(prev => [...prev, aiResponse])
+      } else {
+        throw new Error('Failed to get response')
+      }
+    } catch (error) {
+      console.error('Error sending message:', error)
+      
+      // Remove loading message
+      setMessages(prev => prev.filter(msg => !msg.loading))
+      
+      // Add error message
+      const errorResponse = {
+        id: Date.now() + 2,
+        text: "Sorry, I encountered an error. Please try again.",
         sender: 'ai',
         timestamp: new Date().toISOString()
       }
-      setMessages(prev => [...prev, aiResponse])
-    }, 1000)
+      setMessages(prev => [...prev, errorResponse])
+    }
   }
 
   if (loading) {
@@ -237,7 +284,7 @@ export default function DatabaseChatPage() {
                                 : 'bg-muted text-foreground'
                             }`}
                           >
-                            <p className="text-sm">{message.text}</p>
+                            <p className="text-sm whitespace-pre-wrap">{message.text}</p>
                           </div>
                         </div>
                       ))

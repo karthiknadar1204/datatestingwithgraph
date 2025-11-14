@@ -2,6 +2,7 @@ import { eq, and } from 'drizzle-orm';
 import { db } from '../config/database.js';
 import { databases } from '../models/database.js';
 import { authenticate } from '../middleware/auth.middleware.js';
+import { createSchemaEmbeddings } from '../utils/embeddings.js';
 import pg from 'pg';
 const { Client } = pg;
 
@@ -230,8 +231,9 @@ export const createDatabase = async (req, res) => {
             return res.status(400).json({ message: 'All required fields must be provided' });
         }
 
+        let schemaInfo = null;
         try {
-            const schemaInfo=await fetchPostgreSQLSchema(host, port, database, username, password);
+            schemaInfo = await fetchPostgreSQLSchema(host, port, database, username, password);
             console.log(schemaInfo);
         } catch (error) {
             console.error('Failed to fetch schema:', error);
@@ -247,6 +249,17 @@ export const createDatabase = async (req, res) => {
             password,
             url: url || null
         }).returning();
+
+        // Create schema embeddings asynchronously (non-blocking)
+        if (schemaInfo && schemaInfo.length > 0) {
+            createSchemaEmbeddings(schemaInfo, {
+                id: newDatabase[0].id,
+                name: newDatabase[0].name,
+                dbType: 'postgresql'
+            }).catch(error => {
+                console.error('Failed to create schema embeddings (non-critical):', error);
+            });
+        }
 
         res.status(201).json({ 
             message: 'Database connection created successfully',
