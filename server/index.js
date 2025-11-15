@@ -9,23 +9,34 @@ const app=express();
 
 // Configure CORS for Next.js client on port 3000
 const allowedOrigins = ['http://localhost:3000', 'http://localhost:8025'];
-app.use(cors({
+
+// CORS configuration - must use specific origin (not wildcard) when credentials are enabled
+const corsOptions = {
     origin: function (origin, callback) {
-        // Allow requests with no origin (mobile apps, curl, Postman, etc.)
-        if (!origin) return callback(null, true);
+        // For preflight and actual requests, origin will be present from browser
+        // When credentials are enabled, we MUST return the specific origin string, never '*'
+        if (!origin) {
+            // Requests without origin (Postman, curl, etc.) - don't set CORS headers
+            return callback(null, false);
+        }
         
         if (allowedOrigins.includes(origin)) {
-            callback(null, true);
+            // Return the specific origin string to set Access-Control-Allow-Origin header correctly
+            callback(null, origin);
         } else {
+            // Reject origins not in allowed list
             callback(new Error('Not allowed by CORS'));
         }
     },
-    credentials: true,
+    credentials: true, // This requires a specific origin, not wildcard
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
     allowedHeaders: ['Content-Type', 'Authorization', 'Cookie', 'X-Requested-With'],
     exposedHeaders: ['Content-Range', 'X-Content-Range'],
-    maxAge: 86400 // 24 hours
-}));
+    preflightContinue: false, // Let CORS handle preflight
+    optionsSuccessStatus: 204 // Use 204 for successful OPTIONS requests
+};
+
+app.use(cors(corsOptions));
 
 app.use(express.json());
 app.use(cookieParser());

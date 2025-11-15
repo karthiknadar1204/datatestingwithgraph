@@ -2,6 +2,7 @@ import { openai } from '../utils/openai.js';
 import { index } from '../utils/pinecone.js';
 import { generateSQLQuery } from '../lib/ai/sqlGenerator.js';
 import { executeSQLQuery } from '../lib/db/executeQuery.js';
+import { discoverColumnsFromGraph } from '../lib/graph/queryGraph.js';
 
 /**
  * Query the vector database, generate SQL, and execute it
@@ -97,15 +98,28 @@ export const queryDatabase = async (req, res) => {
             relevanceScore: table.score
         }));
 
+        // Step 3.5: Query Neo4j graph to discover related columns
+        let enhancedTables = relevantTables;
+        if (relevantTables.length > 0) {
+            try {
+                console.log(`🕸️  Querying Neo4j graph to discover related columns...`);
+                enhancedTables = await discoverColumnsFromGraph(connectionId, relevantTables, question);
+                console.log(`✅ Graph discovery completed`);
+            } catch (graphError) {
+                console.error('Graph query failed, using Pinecone results only:', graphError);
+                // Continue with Pinecone results if graph fails
+            }
+        }
+
         // Step 4: Generate SQL query using AI
         let sqlQuery = null;
         let sqlExecutionResult = null;
         let response = '';
 
-        if (relevantTables.length > 0) {
+        if (enhancedTables.length > 0) {
             try {
-                console.log(`🤖 Generating SQL query based on ${relevantTables.length} relevant table(s)...`);
-                sqlQuery = await generateSQLQuery(relevantTables, question);
+                console.log(`🤖 Generating SQL query based on ${enhancedTables.length} relevant table(s) (enhanced with graph discovery)...`);
+                sqlQuery = await generateSQLQuery(enhancedTables, question);
                 console.log(`✅ SQL Query generated: ${sqlQuery}`);
 
                 // Step 5: Execute SQL query on the database
@@ -155,7 +169,7 @@ export const queryDatabase = async (req, res) => {
                 console.error('Error in SQL generation/execution:', sqlError);
                 // Fallback to schema-only response
                 response = `I found relevant schema information but couldn't generate a query:\n\n${sqlError.message}\n\nRelevant Tables:\n`;
-                relevantTables.forEach((table, index) => {
+                enhancedTables.forEach((table, index) => {
                     response += `${index + 1}. ${table.tableName} (PK: ${table.primaryKey})\n`;
                 });
             }
@@ -168,7 +182,7 @@ export const queryDatabase = async (req, res) => {
 
         res.status(200).json({
             response,
-            relevantTables,
+            relevantTables: enhancedTables,
             relationships,
             matchesCount: matches.length,
             sqlQuery: sqlQuery || null,

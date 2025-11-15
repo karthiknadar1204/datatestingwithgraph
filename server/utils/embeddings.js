@@ -1,6 +1,7 @@
 import { openai } from './openai.js';
 import { index } from './pinecone.js';
 import { generatePKColumnPairText, generateRelationshipText } from './schemaTextGenerator.js';
+import { syncSchemaToGraph } from '../lib/graph/schemaSync.js';
 
 /**
  * Estimate token count (rough approximation: ~4 characters = 1 token)
@@ -294,6 +295,11 @@ export const createSchemaEmbeddings = async (schemaInfo, connectionData) => {
         console.log(`      - Total embeddings: ${totalEmbeddings}`);
         console.log(`      - Pinecone batches: ${batchCount}`);
         console.log(`   Connection: ${connectionData.name} (ID: ${connectionData.id})\n`);
+        
+        // Sync schema to Neo4j graph database (non-blocking)
+        syncSchemaToGraph(schemaInfo, connectionData).catch(error => {
+            console.error('Failed to sync schema to Neo4j (non-critical):', error);
+        });
         
     } catch (error) {
         console.error('\n❌ Error creating schema embeddings:', error);
